@@ -1,6 +1,6 @@
 # Neural Net framework
 import numpy as np
-from . import utils
+import utils
 np.random.seed(42)
 
 class Layer(object):

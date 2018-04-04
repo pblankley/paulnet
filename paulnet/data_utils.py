@@ -1,10 +1,119 @@
 from __future__ import print_function
-
+from random import randrange
+import random
 from six.moves import cPickle as pickle
 import numpy as np
 import os
 from scipy.misc import imread
 import platform
+
+def grad_check_scalar(f, x, epsilon=1e-7):
+    """
+    Implement the numerical gradient for a function with a single scalar.
+
+    Arguments:
+    f -- a function that takes a scalar value
+    x -- a real-valued scalar to evaluate the gradient
+    epsilon -- tiny shift to the input to compute the approximated gradient
+
+    Returns:
+    the approximated numerical gradient
+    """
+    xplus = x + epsilon
+    xminus = x - epsilon
+    f_plus = f(xplus)
+    f_minus = f(xminus)
+    grad = (f_plus - f_minus) / (2 * epsilon)
+    return grad
+
+
+def grad_check(f, x, epsilon=1e-7):
+    """
+    Implements the numerical gradient for a function with a vector input.
+
+    Arguments:
+    f -- a function that takes a vector argument
+    x -- input datapoint, of shape (input size, 1)
+    epsilon -- tiny shift to the input to compute approximated gradient
+
+    Returns:
+    the approximated numerical gradient
+    """
+    # Set-up variables
+    xshape = x.shape
+    input_size = x.size
+    grad = np.zeros((input_size,))
+    x = x.ravel()
+
+    # Compute grad
+    for i in range(input_size):
+        # Compute f_plus[i]
+        oldval = x[i]
+        x[i] = oldval + epsilon
+        f_plus =  f(x.reshape(xshape))
+
+        # Compute f_minus[i]
+        x[i] = oldval - epsilon
+        f_minus = f(x.reshape(xshape))
+
+        # Restore
+        x[i] = oldval
+
+        # Compute gradapprox[i]
+        grad[i] = (f_plus - f_minus) / (2 * epsilon)
+    return grad.reshape(xshape)
+
+
+def compare_grads(analytic_grad, num_grad):
+    """
+    Compares the relative difference between the numerical gradient and
+    approximated gradient.
+
+    Arguments:
+    analytic_grad -- analytically evaluated grad
+    num_grad -- numerically approximated grad
+
+    Returns:
+    the relative difference between both gradients.
+    """
+    numerator = np.linalg.norm(analytic_grad - num_grad)
+    denominator = np.linalg.norm(analytic_grad) + np.linalg.norm(num_grad)
+    return numerator / denominator
+
+
+def grad_check_sparse(f, x, analytic_grad, num_checks=10, seed=42, epsilon=1e-5):
+    """
+    Sample a few random elements and only return the relative distance
+    between the numerical and analyitical gradient.
+
+    Arguments:
+    f -- a function that takes a vector argument
+    x -- input ndarray datapoint
+    analytic_grad -- analytically evaluated grad
+    num_checks -- number of coordinates to evaluate
+    epsilon -- tiny shift to the input to compute approximated gradient
+    seed -- indicate seed for randomness control
+
+    Returns: nothing
+    prints the relative difference between gradients for the sampled values.
+    """
+    random.seed(seed)
+    rel_errors = np.empty(num_checks)
+    for i in range(num_checks):
+        ix = tuple([randrange(m) for m in x.shape])
+
+        oldval = x[ix]
+        x[ix] = oldval + epsilon        # increment by epsilon
+        f_pos = f(x)                    # evaluate f(x + epsilon)
+        x[ix] = oldval - epsilon        # increment by epsilon
+        f_minus = f(x)                  # evaluate f(x - epsilon)
+        x[ix] = oldval                  # reset
+
+        grad_numerical = (f_pos - f_minus) / (2 * epsilon)
+        grad_analytic = analytic_grad[ix]
+        rel_error = abs(grad_numerical - grad_analytic) / (abs(grad_numerical) + abs(grad_analytic))
+        rel_errors[i] = rel_error
+    return rel_errors
 
 def load_pickle(f):
     version = platform.python_version_tuple()
@@ -32,7 +141,7 @@ def load_CIFAR10(ROOT):
     f = os.path.join(ROOT, 'data_batch_%d' % (b, ))
     X, Y = load_CIFAR_batch(f)
     xs.append(X)
-    ys.append(Y)    
+    ys.append(Y)
   Xtr = np.concatenate(xs)
   Ytr = np.concatenate(ys)
   del X, Y
@@ -40,172 +149,49 @@ def load_CIFAR10(ROOT):
   return Xtr, Ytr, Xte, Yte
 
 
-def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=1000,
-                     subtract_mean=True):
+def get_CIFAR10_data(num_training=49000, num_validation=1000, num_test=1000, num_dev=500):
     """
     Load the CIFAR-10 dataset from disk and perform preprocessing to prepare
-    it for classifiers. These are the same steps as we used for the SVM, but
-    condensed to a single function.
+    it for the linear classifier. These are the same steps as we used for the
+    SVM, but condensed to a single function.
     """
     # Load the raw CIFAR-10 data
-    cifar10_dir = 'cs231n/datasets/cifar-10-batches-py'
+    cifar10_dir = '../datasets/cifar-10-batches-py'
     X_train, y_train, X_test, y_test = load_CIFAR10(cifar10_dir)
-        
-    # Subsample the data
+
+    # subsample the data
+    # Validation set
     mask = list(range(num_training, num_training + num_validation))
     X_val = X_train[mask]
     y_val = y_train[mask]
+    # Training set
     mask = list(range(num_training))
     X_train = X_train[mask]
     y_train = y_train[mask]
+    # Test set
     mask = list(range(num_test))
     X_test = X_test[mask]
     y_test = y_test[mask]
+    # Dev data set: just for debugging purposes, it overlaps with the training set,
+    # but has a smaller size.
+    mask = np.random.choice(num_training, num_dev, replace=False)
+    X_dev = X_train[mask]
+    y_dev = y_train[mask]
+
+    # Preprocessing: reshape the image data into rows
+    X_train = np.reshape(X_train, (X_train.shape[0], -1))
+    X_val = np.reshape(X_val, (X_val.shape[0], -1))
+    X_test = np.reshape(X_test, (X_test.shape[0], -1))
+    X_dev = np.reshape(X_dev, (X_dev.shape[0], -1))
 
     # Normalize the data: subtract the mean image
-    if subtract_mean:
-      mean_image = np.mean(X_train, axis=0)
-      X_train -= mean_image
-      X_val -= mean_image
-      X_test -= mean_image
-    
-    # Transpose so that channels come first
-    X_train = X_train.transpose(0, 3, 1, 2).copy()
-    X_val = X_val.transpose(0, 3, 1, 2).copy()
-    X_test = X_test.transpose(0, 3, 1, 2).copy()
+    mean_image = np.mean(X_train, axis = 0)
+    X_train -= mean_image
+    X_val -= mean_image
+    X_test -= mean_image
+    X_dev -= mean_image
 
-    # Package data into a dictionary
-    return {
-      'X_train': X_train, 'y_train': y_train,
-      'X_val': X_val, 'y_val': y_val,
-      'X_test': X_test, 'y_test': y_test,
-    }
-    
-
-def load_tiny_imagenet(path, dtype=np.float32, subtract_mean=True):
-  """
-  Load TinyImageNet. Each of TinyImageNet-100-A, TinyImageNet-100-B, and
-  TinyImageNet-200 have the same directory structure, so this can be used
-  to load any of them.
-
-  Inputs:
-  - path: String giving path to the directory to load.
-  - dtype: numpy datatype used to load the data.
-  - subtract_mean: Whether to subtract the mean training image.
-
-  Returns: A dictionary with the following entries:
-  - class_names: A list where class_names[i] is a list of strings giving the
-    WordNet names for class i in the loaded dataset.
-  - X_train: (N_tr, 3, 64, 64) array of training images
-  - y_train: (N_tr,) array of training labels
-  - X_val: (N_val, 3, 64, 64) array of validation images
-  - y_val: (N_val,) array of validation labels
-  - X_test: (N_test, 3, 64, 64) array of testing images.
-  - y_test: (N_test,) array of test labels; if test labels are not available
-    (such as in student code) then y_test will be None.
-  - mean_image: (3, 64, 64) array giving mean training image
-  """
-  # First load wnids
-  with open(os.path.join(path, 'wnids.txt'), 'r') as f:
-    wnids = [x.strip() for x in f]
-
-  # Map wnids to integer labels
-  wnid_to_label = {wnid: i for i, wnid in enumerate(wnids)}
-
-  # Use words.txt to get names for each class
-  with open(os.path.join(path, 'words.txt'), 'r') as f:
-    wnid_to_words = dict(line.split('\t') for line in f)
-    for wnid, words in wnid_to_words.iteritems():
-      wnid_to_words[wnid] = [w.strip() for w in words.split(',')]
-  class_names = [wnid_to_words[wnid] for wnid in wnids]
-
-  # Next load training data.
-  X_train = []
-  y_train = []
-  for i, wnid in enumerate(wnids):
-    if (i + 1) % 20 == 0:
-      print('loading training data for synset %d / %d' % (i + 1, len(wnids)))
-    # To figure out the filenames we need to open the boxes file
-    boxes_file = os.path.join(path, 'train', wnid, '%s_boxes.txt' % wnid)
-    with open(boxes_file, 'r') as f:
-      filenames = [x.split('\t')[0] for x in f]
-    num_images = len(filenames)
-    
-    X_train_block = np.zeros((num_images, 3, 64, 64), dtype=dtype)
-    y_train_block = wnid_to_label[wnid] * np.ones(num_images, dtype=np.int64)
-    for j, img_file in enumerate(filenames):
-      img_file = os.path.join(path, 'train', wnid, 'images', img_file)
-      img = imread(img_file)
-      if img.ndim == 2:
-        ## grayscale file
-        img.shape = (64, 64, 1)
-      X_train_block[j] = img.transpose(2, 0, 1)
-    X_train.append(X_train_block)
-    y_train.append(y_train_block)
-      
-  # We need to concatenate all training data
-  X_train = np.concatenate(X_train, axis=0)
-  y_train = np.concatenate(y_train, axis=0)
-  
-  # Next load validation data
-  with open(os.path.join(path, 'val', 'val_annotations.txt'), 'r') as f:
-    img_files = []
-    val_wnids = []
-    for line in f:
-      img_file, wnid = line.split('\t')[:2]
-      img_files.append(img_file)
-      val_wnids.append(wnid)
-    num_val = len(img_files)
-    y_val = np.array([wnid_to_label[wnid] for wnid in val_wnids])
-    X_val = np.zeros((num_val, 3, 64, 64), dtype=dtype)
-    for i, img_file in enumerate(img_files):
-      img_file = os.path.join(path, 'val', 'images', img_file)
-      img = imread(img_file)
-      if img.ndim == 2:
-        img.shape = (64, 64, 1)
-      X_val[i] = img.transpose(2, 0, 1)
-
-  # Next load test images
-  # Students won't have test labels, so we need to iterate over files in the
-  # images directory.
-  img_files = os.listdir(os.path.join(path, 'test', 'images'))
-  X_test = np.zeros((len(img_files), 3, 64, 64), dtype=dtype)
-  for i, img_file in enumerate(img_files):
-    img_file = os.path.join(path, 'test', 'images', img_file)
-    img = imread(img_file)
-    if img.ndim == 2:
-      img.shape = (64, 64, 1)
-    X_test[i] = img.transpose(2, 0, 1)
-
-  y_test = None
-  y_test_file = os.path.join(path, 'test', 'test_annotations.txt')
-  if os.path.isfile(y_test_file):
-    with open(y_test_file, 'r') as f:
-      img_file_to_wnid = {}
-      for line in f:
-        line = line.split('\t')
-        img_file_to_wnid[line[0]] = line[1]
-    y_test = [wnid_to_label[img_file_to_wnid[img_file]] for img_file in img_files]
-    y_test = np.array(y_test)
-  
-  mean_image = X_train.mean(axis=0)
-  if subtract_mean:
-    X_train -= mean_image[None]
-    X_val -= mean_image[None]
-    X_test -= mean_image[None]
-
-  return {
-    'class_names': class_names,
-    'X_train': X_train,
-    'y_train': y_train,
-    'X_val': X_val,
-    'y_val': y_val,
-    'X_test': X_test,
-    'y_test': y_test,
-    'class_names': class_names,
-    'mean_image': mean_image,
-  }
-
+    return X_train, y_train, X_val, y_val, X_test, y_test, X_dev, y_dev
 
 def load_models(models_dir):
   """

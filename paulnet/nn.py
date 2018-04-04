@@ -1,7 +1,7 @@
 # Neural Network
 import numpy as np
-from . import data as data_util
-from . import utils
+import data as data_util
+import utils
 
 class Network(object):
     def __init__(self, layers, loss, optimizer):
