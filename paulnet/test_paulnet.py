@@ -9,8 +9,8 @@ import data_utils as dutil
 
 # Global variables
 X_train, y_train, X_val, y_val, X_test, y_test, X_dev, y_dev = dutil.get_CIFAR10_data()
-n = X_train.shape[1]         # features dimension
-c = 10                       # number of classes in the database
+n = X_train.shape[1]
+c = 10                    
 Y_dev_enc = ut.encode_labels(y_dev)
 
 def test_CrossEntropyLoss():
@@ -134,8 +134,3 @@ def test_2layer_grad():
         param_grad_num = dutil.grad_check(f, pass_pars, epsilon=1e-5)
         rel_errs[param_name] = ut.rel_error(param_grad_num, net_2.grads[param_name])
     assert(np.allclose(rel_errs,np.zeros(4),atol=1e-7))
-
-test_CrossEntropyLoss()
-test_CrossEntropy_Linear_Grad()
-test_2layer_net()
-test_2layer_grad()

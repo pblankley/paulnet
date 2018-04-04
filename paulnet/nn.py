@@ -1,6 +1,5 @@
 # Neural Network
 import numpy as np
-import data as data_util
 import utils
 
 class Network(object):
