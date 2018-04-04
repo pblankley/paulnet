@@ -7,37 +7,15 @@ import os
 from scipy.misc import imread
 import platform
 
-def grad_check_scalar(f, x, epsilon=1e-7):
-    """
-    Implement the numerical gradient for a function with a single scalar.
-
-    Arguments:
-    f -- a function that takes a scalar value
-    x -- a real-valued scalar to evaluate the gradient
-    epsilon -- tiny shift to the input to compute the approximated gradient
-
-    Returns:
-    the approximated numerical gradient
-    """
-    xplus = x + epsilon
-    xminus = x - epsilon
-    f_plus = f(xplus)
-    f_minus = f(xminus)
-    grad = (f_plus - f_minus) / (2 * epsilon)
-    return grad
-
-
 def grad_check(f, x, epsilon=1e-7):
     """
     Implements the numerical gradient for a function with a vector input.
-
-    Arguments:
-    f -- a function that takes a vector argument
-    x -- input datapoint, of shape (input size, 1)
-    epsilon -- tiny shift to the input to compute approximated gradient
-
-    Returns:
-    the approximated numerical gradient
+    -------
+    Args: f; a function that takes a vector argument
+          x; numpy array of shape inpt_size x 1 
+          epsilon; float; tiny shift to the input to compute approximated gradient
+    -------
+    Returns: numpy array; the approximated numerical gradient
     """
     # Set-up variables
     xshape = x.shape
@@ -64,38 +42,20 @@ def grad_check(f, x, epsilon=1e-7):
     return grad.reshape(xshape)
 
 
-def compare_grads(analytic_grad, num_grad):
-    """
-    Compares the relative difference between the numerical gradient and
-    approximated gradient.
-
-    Arguments:
-    analytic_grad -- analytically evaluated grad
-    num_grad -- numerically approximated grad
-
-    Returns:
-    the relative difference between both gradients.
-    """
-    numerator = np.linalg.norm(analytic_grad - num_grad)
-    denominator = np.linalg.norm(analytic_grad) + np.linalg.norm(num_grad)
-    return numerator / denominator
-
-
 def grad_check_sparse(f, x, analytic_grad, num_checks=10, seed=42, epsilon=1e-5):
     """
     Sample a few random elements and only return the relative distance
     between the numerical and analyitical gradient.
-
-    Arguments:
-    f -- a function that takes a vector argument
-    x -- input ndarray datapoint
-    analytic_grad -- analytically evaluated grad
-    num_checks -- number of coordinates to evaluate
-    epsilon -- tiny shift to the input to compute approximated gradient
-    seed -- indicate seed for randomness control
-
-    Returns: nothing
-    prints the relative difference between gradients for the sampled values.
+    -------
+    Args: f; a function that takes a vector argument
+          x; numpy array the parameters we are differentiating w.r.t of the model 
+          analytic_grad; numpy array; analytically evaluated grad
+          num_checks; int; number of coordinates to evaluate
+          epsilon; float; tiny shift to the input to compute approximated gradient
+          seed; int; random seed value
+    -------
+    Returns: numpy array; the relative errors between the numerically calculate gradient
+                and the analytic one 
     """
     random.seed(seed)
     rel_errors = np.empty(num_checks)

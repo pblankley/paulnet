@@ -4,6 +4,7 @@ import utils
 np.random.seed(42)
 
 class Layer(object):
+    """ Base class for all Layers """
     def __init__(self):
         self.params = dict()
         self.grads = dict()
@@ -18,7 +19,17 @@ class Layer(object):
         return self.forward(x)
 
 class Linear(Layer):
-    """ Standard linear layer """
+    """ Standard linear layer - represents the matrix multiplication XW+b in the simpliest case 
+    -------
+    Args: inpt_dim; int, input dimensions 
+          out_dim; int, output dimensions (now W (weights) is of size inpt_dim,out_dim)
+          reg; str, specify the type of regularization to use.
+          reg_param; flaot, specify the coefficient to use with the regularization method
+          dropout; the probability with which to perform dropout.
+          use_bias; bool, whether to include the bias term or not (defaults to True)
+          init_type; string, type of initialization
+          init_vals; tuple of initial values for the weights and the biases
+    """
     def __init__(self, inpt_dim, out_dim, reg='None',reg_param=0.0, dropout=0.0, use_bias=True, init_type='normal',init_vals=()):
         super(Linear,self).__init__()
         self.inpt_dim = inpt_dim
@@ -49,12 +60,14 @@ class Linear(Layer):
                 self.params['b'] = np.zeros((self.out_dim))
 
     def forward(self, x):
+        """ Simple forward pass which (for x of size nxm) will output shape n x out_dim """
         self.inpt = x
         self.dr_mat = np.random.binomial(n=1,p=(1-self.dropout),size=(self.inpt.shape[0],self.params['W'].shape[1]))
         # return (1/(1-self.dropout))*x@self.params['W']*self.dr_mat+self.params['b']
         return x@self.params['W']+self.params['b']
 
     def backward(self, grad):
+        """ Calculate and return the gradient """
         if self.use_bias:
             self.grads['db'] = np.sum(grad,axis=0)
         # self.grads['dW'] = (1/(1-self.dropout))*self.inpt.T @ grad + self.reg.b(self.params['W'], self.reg_param)
@@ -89,6 +102,7 @@ class Relu(Layer):
 
 
 class Softmax(Layer):
+    """ Softmax layer """
     def __init__(self):
         self.act = True
         self.inpt = None
@@ -103,6 +117,7 @@ class Softmax(Layer):
         return np.diag(sm_out) - sm_out @ sm_out.T
 
 class Log_softmax(Layer):
+    """ Log softmax Layer """
     def __init__(self):
         self.act = True
         self.inpt = None
